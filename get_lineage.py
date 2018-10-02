@@ -1,3 +1,6 @@
+# requires ETE toolkit and the ncbi taxnomy module (see http://etetoolkit.org/docs/latest/tutorial/tutorial_ncbitaxonomy.html)
+# expects file with a NCBI taxa ID on each line 
+
 from ete3 import NCBITaxa
 import sys
 ncbi = NCBITaxa()
@@ -5,7 +8,6 @@ ncbi = NCBITaxa()
 d={}
 
 print 'taxid\tSpecies\tGenus\tFamily\tOrder\tClass\tPhylum\tKingdom'
-
 
 with open(sys.argv[1]) as f:
     for line in f:
@@ -37,7 +39,4 @@ with open(sys.argv[1]) as f:
 				if ncbi.get_rank([clade]).values()[0]=='kingdom':
 					Kingdom=ncbi.get_taxid_translator([clade]).values()[0]
         print ID,'\t',Species,'\t',Genus,'\t',Family,'\t',Order,'\t',Class,'\t',Phylum,'\t',Kingdom
-
-
-
 
