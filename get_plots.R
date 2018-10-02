@@ -1,5 +1,5 @@
 #script used to generate plots and analyze data for sequencing disparity ms
-#recommended to execute in IDE like RStudio
+#written to execute in RStudio
 
 ##NOTES##
 #before filtering 55 entries removes because did not have the expected number of rows (entry error, pooled samples)
