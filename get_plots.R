@@ -241,7 +241,7 @@ g1bases + coord_cartesian(xlim = c(21, 123),expand = F)
 summary(lm(category_bases_relative[category_bases_relative$category=="99",]$freq ~ 
              category_bases_relative[category_bases_relative$category=="99",]$datecount))
 
-#figure S3
+#figure S2
 bases_month_full <- unique(complete(bases_data_species[,c(2,3,10)],Species,datecount=21:123))
 bases_month_full[is.na(bases_month_full$bases),]$bases = 0
 bases_month_full <- bases_month_full %>%
