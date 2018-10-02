@@ -1,5 +1,5 @@
 #script used to generate plots and analyze data for sequencing disparity ms
-#recommended to execute in IDE like RStudio
+#written to execute in RStudio
 
 ##NOTES##
 #before filtering 55 entries removes because did not have the expected number of rows (entry error, pooled samples)
@@ -197,16 +197,14 @@ summary(lm(recentdanio$freq ~ recentdanio$datecount))
 length(unique(data[data$strategy=="WGS",]$Species))
 
 #Data SI
+write.table(species_month_total[c("date","Species","Genus","Family","Order","Class","Phylum","Kingdom","experiments","bases")],"SupplementalII.txt",sep = "\t",
+            quote=F,row.names = F,col.names = c("Month","Species","Genus","Family","Order","Class","Phylum","Kingdom","Total Number of Experiments","Total Number of Bases"))
+
+#Data SII
 species_merged <- merge(species_percentiles,species_full)
 write.table(species_merged[c("Species","Genus","Family","Order","Class","Phylum","Kingdom","experiments","rank","percentile","percentof","exp_slope","exp_p","freq_slope","freq_p","bases")],"SupplementalI.txt",
             sep = "\t",quote=F,row.names = F,col.names = c("Species","Genus","Family","Order","Class","Phylum","Kingdom","Total Number of Experiments","Rank (Experiments)",
                                                            "Percentile (Experiments)","Percent of Database (Experiments)","Change in # of Experiments/Month","p","Change in % of Dataset/Month","p","Total Number of Bases"))
-
-
-#Data SII
-write.table(species_month_total[c("date","Species","Genus","Family","Order","Class","Phylum","Kingdom","experiments","bases")],"SupplementalII.txt",sep = "\t",
-            quote=F,row.names = F,col.names = c("Month","Species","Genus","Family","Order","Class","Phylum","Kingdom","Total Number of Experiments","Total Number of Bases"))
-
 
 #bases instead of experiments
 bases_data <- subset(data,is.na(data$bases)==F) 
@@ -241,7 +239,7 @@ g1bases + coord_cartesian(xlim = c(21, 123),expand = F)
 summary(lm(category_bases_relative[category_bases_relative$category=="99",]$freq ~ 
              category_bases_relative[category_bases_relative$category=="99",]$datecount))
 
-#figure S3
+#figure S2
 bases_month_full <- unique(complete(bases_data_species[,c(2,3,10)],Species,datecount=21:123))
 bases_month_full[is.na(bases_month_full$bases),]$bases = 0
 bases_month_full <- bases_month_full %>%
