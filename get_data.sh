@@ -1,3 +1,3 @@
 #!/bin/bash
-#script to pull accession numbers, taxon ids, sequencing strategies, and dates of the first run for each nonhuman eukaryotic high-throughput sequencing experiment in the SRA
-esearch -db sra -query "(Eukaryota[Organism] NOT Homo sapiens[Organism])" | efetch -format xml | xtract -pattern EXPERIMENT_PACKAGE -element EXPERIMENT@accession -element TAXON_ID -element LIBRARY_STRATEGY -element -first RUN@published
+#script to pull accession numbers, taxon ids, sequencing strategies, # of bases, and dates of the first run for each nonhuman eukaryotic high-throughput sequencing experiment in the SRA
+esearch -db sra -query "(Eukaryota[Organism] NOT Homo sapiens[Organism])" | efetch -format xml | xtract -pattern EXPERIMENT_PACKAGE -def "NA" -element EXPERIMENT@accession -element TAXON_ID -element LIBRARY_STRATEGY -element -sum RUN@total_bases -element -first RUN@published
