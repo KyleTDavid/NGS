@@ -10,6 +10,7 @@ library(vegan)
 library(ggplot2)
 library(tidyr)
 library(RColorBrewer)
+library(ape)
 
 #function to get nice (I think) colors
 gg_color_hue <- function(n) {
@@ -215,7 +216,30 @@ bases_data_species <- bases_data %>%
   select(-taxid, -accession, -strategy) %>%
   distinct()
 
-#figure S1
+#figure S1 part of code edited from https://bitbucket.org/caseywdunn/animal-genomes/src
+dataclade=data
+dataclade$clade=ifelse(is.na(data$Class)==F,data$Class,ifelse(is.na(data$Order)==F,data$Order,data$Genus))
+dataclade$clade=trimws(dataclade$clade)
+cladeprop = function(x) {
+  length(x)/length(dataclade$clade)
+}
+clade_data=aggregate(date ~ clade, dataclade, cladeprop)
+clade_data_filt=clade_data[clade_data$date>0.01,]
+tre = read.tree("tree.txt")
+plot( tre, edge.width=5, show.tip.label = F, x.lim=c(0,50),node.depth = 2)
+x_offset = 7 # x position of start of bars
+one_size = 110 # how big the bar should be for a value of 1
+abline(v=( x_offset + .1*one_size), col="gray")
+abline(v=( x_offset + .2*one_size), col="gray")
+abline(v=( x_offset + .3*one_size), col="gray")
+abline(v=( x_offset + .4*one_size), col="gray")
+rownames(clade_data_filt) <- clade_data_filt$clade
+clade_data_filt = clade_data_filt[match(tre$tip.label, clade_data_filt$clade),]
+segments(x_offset,1:nrow(clade_data_filt), x_offset + pmax(clade_data_filt$date*one_size, 0 ), 1:nrow(clade_data_filt), lwd=9, col=gg_color_hue(9), lend=1 ) 
+
+
+
+#figure S2
 bases_month_relative <- bases_data_species %>% 
   group_by(datecount) %>% 
   mutate(percentile = percent_rank(bases))
@@ -239,7 +263,7 @@ g1bases + coord_cartesian(xlim = c(21, 123),expand = F)
 summary(lm(category_bases_relative[category_bases_relative$category=="99",]$freq ~ 
              category_bases_relative[category_bases_relative$category=="99",]$datecount))
 
-#figure S2
+#figure S3
 bases_month_full <- unique(complete(bases_data_species[,c(2,3,10)],Species,datecount=21:123))
 bases_month_full[is.na(bases_month_full$bases),]$bases = 0
 bases_month_full <- bases_month_full %>%
