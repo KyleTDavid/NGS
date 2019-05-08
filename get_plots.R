@@ -121,7 +121,97 @@ twenty_eighteen <- aggregate(experiments ~ Species,twenty_eighteen,sum)
 twenty_eighteen$percentile <- percent_rank(twenty_eighteen$experiments)
 sum(twenty_eighteen[twenty_eighteen$percentile>=0.99,]$experiments)/sum(twenty_eighteen$experiments)
 
-#figure 1 part of code edited from https://bitbucket.org/caseywdunn/animal-genomes/src
+#calculate species richness and evenness for each month
+month_richness <- setNames(aggregate(experiments ~ datecount,species_month_total,function(x) length(x)),c("datecount","richness"))
+month_evenness <- setNames(aggregate(experiments ~ datecount,species_month_total,function(x){diversity(x)/log(length(x))}),c("datecount","evenness"))
+#linear model of richness over time
+lm_richness <- lm(month_richness$richness ~ month_richness$datecount)
+summary(lm_richness)
+#richness in 2010
+length(twenty_ten$Species)
+#in 2018
+length(twenty_eighteen$Species)
+#linear model of evenness over time
+summary(lm(month_evenness$evenness ~ month_evenness$datecount))
+#figure 1a
+g1a <- ggplot(month_evenness, aes(datecount,evenness)) +
+  #geom_smooth(aes(month_evenness$datecount,month_evenness$evenness),method = 'lm',se=F,size=0.75,color="black") +
+  geom_smooth(aes(month_evenness$datecount,month_evenness$evenness,fill=gg_color_hue(2)[2]), color=gg_color_hue(2)[1],size=2,show.legend = F) +
+  geom_point(color=gg_color_hue(2)[1],size=3) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), plot.margin = unit(c(1, 1, 4, 1), "lines"), axis.title.x=element_blank(),
+        axis.text.x=element_blank(), axis.ticks.x=element_blank(), panel.grid.minor.x = element_line(color = "white", size=0.5),
+        panel.grid.major.x = element_line(color = "gray", size=1), axis.title.y=element_blank()) + 
+  scale_x_continuous(minor_breaks = seq(0:200), breaks = seq(21,128,12)) +
+  scale_y_continuous(sec.axis = sec_axis(~.*2000)) +
+  #geom_smooth(aes(month_richness$datecount,month_richness$richness/2000),method = 'lm',se=F,size=0.75,color="black") +
+  geom_smooth(aes(month_richness$datecount,month_richness$richness/2000,fill=gg_color_hue(2)[1]), color=gg_color_hue(2)[2],size=2,show.legend = F) +
+  geom_point(aes(month_richness$datecount,month_richness$richness/2000), size=3, color=gg_color_hue(2)[2])
+g1a + coord_cartesian(xlim = c(21, 128),ylim=c(0,1),expand = F) 
+
+#figure 1b
+pal <- brewer.pal(3,name="YlGnBu")
+g1b <- ggplot(category_month_relative, aes(x=datecount,y=experiments,group=category,fill=category)) + geom_area(position='fill') +
+  scale_fill_manual(values = c(pal[3],pal[2],pal[1])) +
+  theme(axis.title.x=element_blank(), axis.text.x=element_blank(), legend.position="none",axis.title.y=element_blank(),axis.text.y=element_blank()) +
+  scale_x_continuous(breaks = seq(21,128,12))
+g1b + coord_cartesian(xlim = c(21, 128),expand = F) 
+
+#fill data frame for every possible species month combo, 
+species_month_full <- unique(complete(species_month_relative[,c(10,3,11)],Species,datecount=21:128))
+species_month_full[is.na(species_month_full$experiments),]$experiments = 0
+species_month_full <- species_month_full %>%
+  group_by(datecount) %>%
+  mutate(freq = experiments/sum(experiments))
+#get linear slopes and p values of # of experiments and % of dataset for each species over time
+species_full <- species_month_full %>%
+  group_by(Species) %>%
+  mutate(exp_slope = coef(lm(experiments ~ datecount))[2]) %>%
+  mutate(exp_p = summary(lm(experiments ~ datecount))$coefficients[2,"Pr(>|t|)"]) %>%
+  mutate(freq_slope = coef(lm(freq ~ datecount))[2]) %>%
+  mutate(freq_p = summary(lm(freq ~ datecount))$coefficients[2,"Pr(>|t|)"]) %>%
+  select(-datecount, -experiments, -freq) %>%
+  distinct()
+
+#significant experiment change
+sign_exp_full <- species_full[species_full$exp_p<0.05,]
+#positive?
+sign_pos_exp <- sign_exp_full[which(sign_exp_full$exp_slope>0),]
+#negative?
+sign_neg_exp <- sign_exp_full[which(sign_exp_full$exp_slope<0),]
+
+#significant frequency change
+sign_freq_full <- species_full[species_full$freq_p<0.05,]
+#positive?
+sign_pos_freq <- sign_freq_full[which(sign_freq_full$freq_slope>0),]
+#negative?
+sign_neg_freq <- sign_freq_full[which(sign_freq_full$freq_slope<0),]
+
+#how many species with whole genomes?
+length(unique(data[data$strategy=="WGS",]$Species))
+
+#iucn data, file downloaded from IUCN website
+iucn <- read.csv("taxonomy.csv")
+iucn_species <- paste(iucn$genusName,iucn$speciesName)
+sra_species <- trimws(species_data$Species)
+length(intersect(iucn_species,sra_species))
+iucn_species[1]
+
+#look at seq strats
+strat = aggregate(date ~ strategy,data,length)
+
+
+#Supplementary experiments data table
+write.table(species_month_total[c("date","Species","Genus","Family","Order","Class","Phylum","Kingdom","experiments","bases")],"SupplementalII.txt",sep = "\t",
+            quote=F,row.names = F,col.names = c("Month","Species","Genus","Family","Order","Class","Phylum","Kingdom","Total Number of Experiments","Total Number of Bases"))
+
+#Supplementary species data table 
+species_merged <- merge(species_percentiles,species_full)
+write.table(species_merged[c("Species","Genus","Family","Order","Class","Phylum","Kingdom","experiments","rank","percentile","percentof","exp_slope","exp_p","freq_slope","freq_p","bases")],"SupplementalI.txt",
+            sep = "\t",quote=F,row.names = F,col.names = c("Species","Genus","Family","Order","Class","Phylum","Kingdom","Total Number of Experiments","Rank (Experiments)",
+                                                           "Percentile (Experiments)","Percent of Database (Experiments)","Change in # of Experiments/Month","p","Change in % of Dataset/Month","p","Total Number of Bases"))
+
+
+#old figure not included in final ms, part of code edited from https://bitbucket.org/caseywdunn/animal-genomes/src
 dataclade=data
 dataclade$clade=ifelse(is.na(data$Class)==F,data$Class,ifelse(is.na(data$Order)==F,data$Order,data$Genus))
 dataclade$clade=trimws(dataclade$clade)
@@ -153,84 +243,6 @@ rownames(topspecies_data) <- topspecies_data$clade
 topspecies_data = topspecies_data[match(tre$tip.label, topspecies_data$clade),]
 segments(x_offset,1:nrow(clade_data_filt), x_offset + pmax(topspecies_data$date*one_size, 0 ), 1:nrow(topspecies_data), lwd=8, col=darken(gg_color_hue(12),1.4), lend=1 ) 
 
-#calculate species richness and evenness for each month
-month_richness <- setNames(aggregate(experiments ~ datecount,species_month_total,function(x) length(x)),c("datecount","richness"))
-month_evenness <- setNames(aggregate(experiments ~ datecount,species_month_total,function(x){diversity(x)/log(length(x))}),c("datecount","evenness"))
-#linear model of richness over time
-lm_richness <- lm(month_richness$richness ~ month_richness$datecount)
-summary(lm_richness)
-#richness in 2010
-length(twenty_ten$Species)
-#in 2018
-length(twenty_eighteen$Species)
-#linear model of evenness over time
-summary(lm(month_evenness$evenness ~ month_evenness$datecount))
-#figure 2
-g2 <- ggplot(month_evenness, aes(datecount,evenness)) +
-  #geom_smooth(aes(month_evenness$datecount,month_evenness$evenness),method = 'lm',se=F,size=0.75,color="black") +
-  geom_smooth(aes(month_evenness$datecount,month_evenness$evenness,fill=gg_color_hue(2)[2]), color=gg_color_hue(2)[1],size=2,show.legend = F) +
-  geom_point(color=gg_color_hue(2)[1],size=3) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), plot.margin = unit(c(1, 1, 4, 1), "lines"), axis.title.x=element_blank(),
-        axis.text.x=element_blank(), axis.ticks.x=element_blank(), panel.grid.minor.x = element_line(color = "white", size=0.5),
-        panel.grid.major.x = element_line(color = "gray", size=1), axis.title.y=element_blank()) + 
-  scale_x_continuous(minor_breaks = seq(0:200), breaks = seq(21,128,12)) +
-  scale_y_continuous(sec.axis = sec_axis(~.*2000)) +
-  #geom_smooth(aes(month_richness$datecount,month_richness$richness/2000),method = 'lm',se=F,size=0.75,color="black") +
-  geom_smooth(aes(month_richness$datecount,month_richness$richness/2000,fill=gg_color_hue(2)[1]), color=gg_color_hue(2)[2],size=2,show.legend = F) +
-  geom_point(aes(month_richness$datecount,month_richness$richness/2000), size=3, color=gg_color_hue(2)[2])
-g2 + coord_cartesian(xlim = c(21, 128),ylim=c(0,1),expand = F) 
-
-#fill data frame for every possible species month combo, 
-species_month_full <- unique(complete(species_month_relative[,c(10,3,11)],Species,datecount=21:128))
-species_month_full[is.na(species_month_full$experiments),]$experiments = 0
-species_month_full <- species_month_full %>%
-  group_by(datecount) %>%
-  mutate(freq = experiments/sum(experiments))
-#get linear slopes and p values of # of experiments and % of dataset for each species over time
-species_full <- species_month_full %>%
-  group_by(Species) %>%
-  mutate(exp_slope = coef(lm(experiments ~ datecount))[2]) %>%
-  mutate(exp_p = summary(lm(experiments ~ datecount))$coefficients[2,"Pr(>|t|)"]) %>%
-  mutate(freq_slope = coef(lm(freq ~ datecount))[2]) %>%
-  mutate(freq_p = summary(lm(freq ~ datecount))$coefficients[2,"Pr(>|t|)"]) %>%
-  select(-datecount, -experiments, -freq) %>%
-  distinct()
-#significant experiment change
-sign_exp_full <- species_full[species_full$exp_p<0.05,]
-#positive?
-sign_pos_exp <- sign_exp_full[which(sign_exp_full$exp_slope>0),]
-#negative?
-sign_neg_exp <- sign_exp_full[which(sign_exp_full$exp_slope<0),]
-
-#significant frequency change
-sign_freq_full <- species_full[species_full$freq_p<0.05,]
-#positive?
-sign_pos_freq <- sign_freq_full[which(sign_freq_full$freq_slope>0),]
-#negative?
-sign_neg_freq <- sign_freq_full[which(sign_freq_full$freq_slope<0),]
-
-#how many species with whole genomes?
-length(unique(data[data$strategy=="WGS",]$Species))
-
-#iucn data, file downloaded from IUCN website
-iucn <- read.csv("taxonomy.csv")
-iucn_species <- paste(iucn$genusName,iucn$speciesName)
-sra_species <- trimws(species_data$Species)
-length(intersect(iucn_species,sra_species))
-
-iucn_species[1]
-
-#look at seq strats
-strat = aggregate(date ~ strategy,data,length)
-
-#old figure not included
-pal <- brewer.pal(3,name="YlGnBu")
-g1 <- ggplot(category_month_relative, aes(x=datecount,y=experiments,group=category,fill=category)) + geom_area(position='fill') +
-  scale_fill_manual(values = c(pal[3],pal[2],pal[1])) +
-  theme(axis.title.x=element_blank(), axis.text.x=element_blank(), legend.position="none",axis.title.y=element_blank(),axis.text.y=element_blank()) +
-  scale_x_continuous(breaks = seq(21,128,12))
-g1 + coord_cartesian(xlim = c(21, 128),expand = F) 
-
 #old figure not included
 NIH_species_month <-species_month_full[species_month_full$Species %in% c("Mus musculus ","Saccharomyces cerevisiae ",
                                                                          "Caenorhabditis elegans ","Drosophila melanogaster ","Danio rerio ",
@@ -238,16 +250,6 @@ NIH_species_month <-species_month_full[species_month_full$Species %in% c("Mus mu
 g3 <- ggplot(NIH_species_month,aes(datecount, freq, color=Species)) + geom_smooth(se=F,size=1) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + theme(plot.margin = unit(c(1, 1, 4, 1), "lines"), axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), panel.grid.minor.x = element_line(color = "white", size=0.5), panel.grid.major.x = element_line(color = "gray", size=1)) + 
   scale_x_continuous(minor_breaks = seq(0:200),breaks = seq(21,128,12)) #+ theme(legend.position="none",axis.title.y=element_blank())
 g3 + coord_cartesian(xlim = c(21, 128), ylim = c(0,.40),expand = F)
-
-#Supplementary experiments data table
-write.table(species_month_total[c("date","Species","Genus","Family","Order","Class","Phylum","Kingdom","experiments","bases")],"SupplementalII.txt",sep = "\t",
-            quote=F,row.names = F,col.names = c("Month","Species","Genus","Family","Order","Class","Phylum","Kingdom","Total Number of Experiments","Total Number of Bases"))
-
-#Supplementary species data table 
-species_merged <- merge(species_percentiles,species_full)
-write.table(species_merged[c("Species","Genus","Family","Order","Class","Phylum","Kingdom","experiments","rank","percentile","percentof","exp_slope","exp_p","freq_slope","freq_p","bases")],"SupplementalI.txt",
-            sep = "\t",quote=F,row.names = F,col.names = c("Species","Genus","Family","Order","Class","Phylum","Kingdom","Total Number of Experiments","Rank (Experiments)",
-                                                           "Percentile (Experiments)","Percent of Database (Experiments)","Change in # of Experiments/Month","p","Change in % of Dataset/Month","p","Total Number of Bases"))
 
 #bases instead of experiments
 bases_data <- subset(data,is.na(data$bases)==F) 
@@ -282,7 +284,7 @@ g1bases + coord_cartesian(xlim = c(21, 123),expand = F)
 summary(lm(category_bases_relative[category_bases_relative$category=="99",]$freq ~ 
              category_bases_relative[category_bases_relative$category=="99",]$datecount))
 
-#figure 2 with bases 
+#old with bases 
 bases_month_full <- unique(complete(bases_data_species[,c(2,3,10)],Species,datecount=21:123))
 bases_month_full[is.na(bases_month_full$bases),]$bases = 0
 bases_month_full <- bases_month_full %>%
